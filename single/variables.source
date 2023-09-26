@@ -1,0 +1,185 @@
+#!/bin/bash
+
+#----------------------------------------------------------------------------#
+# PKGNAME is the software being installed, prefer all lower case             #
+# VERSION should match as best as possible the official number,              #
+# which might often mean not x.y.z, but instead x.y or x.y-rc1               #
+#----------------------------------------------------------------------------#
+PKGNAME=${PKGNAME}
+VERSION=${VERSION}
+
+#----------------------------------------------------------------------------#
+# Suffix for compiler/mpi designations (e.g., append '-gcc-7.3.0')           #
+# Ex: "VERSION" "VERSION-COMPILER_USED" "VERSION-MPI_USED"                   #
+# Typically, the normal variables.source should be default value,            #
+# usually stock gcc; installs.d variants add new compiler/mpi combos         #
+#----------------------------------------------------------------------------#
+MAJOR=${MAJOR}
+MINOR=${MINOR}
+PATCH=${PATCH}
+MODULE_VERSION="${MODULE_VERSION}"
+
+#----------------------------------------------------------------------------#
+# WGET_URL can be an archive (e.g., tar.gz, zip, xz) or git repo path        #
+# If git, ensure WGET_DEST also reflects .git extension.                     #
+# GIT_COMMIT is used when a repo URL is provided for checking out,           #
+# but can also be filled in for documentation if using an archived git repo  #
+# EXTRACTED_DIRNAME usually matches this pattern, but some packages deviate  #
+# such as python.tar.gz extracting Python-VERSION, so change as req'd.       #
+#----------------------------------------------------------------------------#
+WGET_URL="${WGET_URL}"
+WGET_DEST=${WGET_DEST}
+GIT_COMMIT="${GIT_COMMIT}"
+EXTRACTED_DIRNAME="${EXTRACTED_DIRNAME}"
+
+#----------------------------------------------------------------------------#
+# BUILD_DEPS are the modules loaded in steps 2/3/4.                          #
+# RUNTIME_DEPS are filled in to modulefile during step 5, load+prereq        #
+# CONFLICT_DEPS is a STRING, step 5, e.g., "openmpi mvapich2 intel-mpi gcc"  #
+#----------------------------------------------------------------------------#
+BUILD_DEPS=${BUILD_DEPS}
+RUNTIME_DEPS=${RUNTIME_DEPS}
+CONFLICT_DEPS="${CONFLICT_DEPS}"
+
+#----------------------------------------------------------------------------#
+# COMPILATION DETAILS:                                                       #
+# Source/archive will be extracted to a newly created directory in your      #
+# user's scratch space: /scratch/USER/builds/PKGNAME/BUILD_ID                #
+# When executing step 1 in the package's build directory, a new BUILD_ID     #
+# will be randomly generated and the scratch/ and src/ symlinks will be      #
+# created pointing to this new space. As you continue through steps 2-4,     #
+# the BUILD_ID will be detected from these symlinks automatically.           #
+#                                                                            #
+# If a BUILD_ID is provided (as is the case for all sbatched compilations)   #
+# it will subsequently need to be provided on steps 2-5. When a BUILD_ID     #
+# is provided, the symlink steps are skipped.                                #
+#                                                                            #
+# Running ./1_untar.sh without a BUILD_ID will also clean up previous src    #
+# So ./1_untar.sh might generate BUILD_ID 1553. ./1_untar.sh again will      #
+# rm -rf /scratch/.../1553 an then create a new dir, such as /5843           #
+#                                                                            #
+# Many softwares will expect CONFIGURE_ARGS that point to absolute paths.    #
+# Using absolute paths is ok, but it is encouraged to use specially-named    #
+# variables that will let the system build it for 7x/ and uniform/ trees.    #
+# {PACKAGE_BASEDIR} will expand to 7x) /packages/7x or in the uniform tree,  #
+# will expand to /packages/uniform/{ARCH}/{COMPILER}                         #
+#                                                                            #
+# See /packages/uniform/build/{header,module}.source for further details.    #
+#                                                                            #
+#         )\._.,--....,'``.                                                  #
+#        /,   _.. \   _\  (`._ ,.                                            #
+#   @   `._.-(,_..'--(,_..'`-.;.'                                            #
+#                                                                            #
+#----------------------------------------------------------------------------#
+
+#----------------------------------------------------------------------------#
+# Building is source tree is generally easier, as most software does not fuss.
+# Some software requires separate, clean build trees (like compilers) and this
+# will create a directory scratch/objdir and run config/makes from there.
+#----------------------------------------------------------------------------#
+BUILD_IN_SRC_DIR=${BUILD_IN_SRC_DIR}
+
+#----------------------------------------------------------------------------#
+# Some software extracts source into a directory two-levels deep.            #
+# Enter directory name no trailing slash: SRC_DIR=src/STEP_INTO_SUBDIR       #
+#----------------------------------------------------------------------------#
+STEP_INTO_SUBDIR="${STEP_INTO_SUBDIR}"
+
+#----------------------------------------------------------------------------#
+# 2.1 - Execute command prior to `cmake`/`configure`                         #
+# If multiple commands are required, chain them with `&&` as neccessary.     #
+#----------------------------------------------------------------------------#
+PRE_CONFIGURE_CMD="${PRE_CONFIGURE_CMD}"
+
+#----------------------------------------------------------------------------#
+# 2.2 - For using `cmake`:                                                   #
+# > cmake CMAKE_ARGS SRC_DIR                                                 #
+# Instead of manually adding -DCMAKE_INSTALL_PREFIX=..., change false to true#
+# If CMAKE_ARGS="", cmake is skipped (unless APPEND_CMAKE...=true)           #
+#----------------------------------------------------------------------------#
+CMAKE_ARGS="${CMAKE_ARGS}"
+APPEND_CMAKE_INSTALL_PREFIX=${APPEND_CMAKE_INSTALL_PREFIX}
+
+#----------------------------------------------------------------------------#
+# 2.3 - For using `make`:                                                    #
+# > SRC_DIR/configure CONFIGURE_ARGS                                         #
+# Instead of manually adding --prefix=..., use true instead of false         #
+# If CONFIGURE_ARGS="", configure is skipped (unless APPEND_PREFIX...=true)  #
+#----------------------------------------------------------------------------#
+CONFIGURE_ARGS="${CONFIGURE_ARGS}"
+APPEND_PREFIX="${APPEND_PREFIX}"
+
+#----------------------------------------------------------------------------#
+# 2.4 - Execute command after `cmake`/`make` complete:                       #
+#----------------------------------------------------------------------------#
+POST_CONFIGURE_CMD="${POST_CONFIGURE_CMD}"
+
+#----------------------------------------------------------------------------#
+# 3.1a - If an alternate build technique is required, enter command here.    #
+# Separate multiple commands with &&, e.g., "cd BUILD_DIR && touch file"     #
+# Either ALTERNATE_BUILD_COMMAND is used OR `make`, not both.                #
+#----------------------------------------------------------------------------#
+ALTERNATE_BUILD_COMMAND="${ALTERNATE_BUILD_COMMAND}"
+
+#----------------------------------------------------------------------------#
+# 3.1b - Regular `make` arguments                                            #
+# This will be used if CONTENTS_TO_CP is a empty string, e.g., ""            #
+# > make {MAKE_ARGS} {MAKE_JOBS}                                             #
+#                                                                            #
+# MAKE_ARGS: include inline make variables or target, e.g., "SOMEVAR=foo all"#
+# MAKE_JOBS: "-j 28" default for broadwell, "-j 20" for skylake, etc.        #
+#----------------------------------------------------------------------------#
+MAKE_ARGS="${MAKE_ARGS}"
+MAKE_JOBS="${MAKE_JOBS}"
+
+#----------------------------------------------------------------------------#
+# 3.2 - Additional `make` targets                                            #
+# Useful for `make check` or other targets above and beyond 'all'            #
+# > make MAKE_TARGETS[@]                                                     #
+#----------------------------------------------------------------------------#
+MAKE_TARGETS=${MAKE_TARGETS}
+
+#----------------------------------------------------------------------------#
+# 4.1a - Alternative `cp` installation                                       #
+# Precompiled binaries or executable scripts, `make [install]` is not used.  #
+# Use this installation for such packages that need to just be copied.       #
+# > cp -R BUILD_DIR/CONTENTS_TO_CP/* DEST_SUBDIR                             #
+#                                                                            #
+# CONTENTS_TO_CP: omit trailing /; use "." for base/BUILD directory          #
+# DEST_SUBDIR: add'l directory structure, e.g., PKGNAME/VERSION/DEST_SUBDIR  #
+# CP_ONLY_WHITELISTED_FILES: ("file1" "file2") individual cp, not wildcard   #
+#----------------------------------------------------------------------------#
+CONTENTS_TO_CP="${CONTENTS_TO_CP}"
+DEST_SUBDIR="${DEST_SUBDIR}"
+CP_ONLY_WHITELISTED_FILES=${CP_ONLY_WHITELISTED_FILES}
+
+#----------------------------------------------------------------------------#
+# 4.1b - Regular `make install` arguments, e.g., DESTDIR=PATH                #
+# This will be ignored if CONTENTS_TO_CP is used                             #
+# Instead of manually adding PREFIX=..., change false to true                #
+# > make MAKE_INSTALL_ARGS install                                           #
+#----------------------------------------------------------------------------#
+MAKE_INSTALL_ARGS="${MAKE_INSTALL_ARGS}"
+MAKE_INSTALL_APPEND_PREFIX="${MAKE_INSTALL_APPEND_PREFIX}"
+MAKE_PREFIX_LOWER_CASE="${MAKE_PREFIX_LOWER_CASE}"
+
+#----------------------------------------------------------------------------#
+# START ENVIRONMENT VARIABLES/EXPORTS                                        #
+# `export USE_MPIF4="y"` or `unset F77`                                      #
+#----------------------------------------------------------------------------#
+
+#----------------------------------------------------------------------------#
+# END ENVIRONMENT VARIABLES/EXPORTS                                          #
+#----------------------------------------------------------------------------#
+
+#----------------------------------------------------------------------------#
+# START MODULEFILE VARIABLES                                                 #
+#----------------------------------------------------------------------------#
+A2C2_TAGS="${A2C2_TAGS}"
+A2C2_DESCRIPTION="${A2C2_DESCRIPTION}"
+A2C2_URL="${A2C2_URL}"
+A2C2_NOTES="${A2C2_NOTES}"
+#----------------------------------------------------------------------------#
+# END MODULEFILE VARIABLES                                                   #
+#----------------------------------------------------------------------------#
+
